@@ -5,8 +5,8 @@ import "./BridgeBase.sol";
 
 contract BridgeETH is BridgeBase {
     constructor(address _validator, address _erc20) {
-        erc20 = ERC20(_erc20);
         validator = _validator;
+        erc20 = ERC20(_erc20);
 
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }

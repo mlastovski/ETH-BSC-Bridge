@@ -8,52 +8,94 @@ contract BridgeBase is AccessControl {
     ERC20 erc20;
     address public validator;
 
-    struct Signature {
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
-    }
-
     mapping(uint256 => bool) supportedChains;
     mapping(bytes32 => bool) redeemed;
 
     event SwapInitialized(
-        uint256 _amount, 
-        uint256 _chainTo, 
-        uint256 _chainFrom, 
-        address _from, 
-        address _to
+        uint256 amount, 
+        address from, 
+        address to,
+        uint256 chainTo, 
+        uint256 chainFrom, 
+        uint256 nonce
     ); 
 
     event SwapRedeemed(
-        bytes32 _hash,
-        uint256 _amount,
-        uint256 _chainFrom,
-        address _to
+        uint256 amount,
+        address to,
+        uint256 chainFrom,
+        bytes32 swapHash
     );
 
-    event ChainAdded(uint256 _id, address _from);
+    event ChainAdded(uint256 id, address from);
 
-    event ChainRemoved(uint256 _id, address _from);
+    event ChainRemoved(uint256 id, address from);
 
-    function swap(uint256 _amount, address _to, uint256 _chainTo) public {
-        require(supportedChains[_chainTo], "This chain is not supported");
+    function swap(
+        uint256 amount, 
+        address to, 
+        uint256 chainTo, 
+        uint256 nonce
+    ) 
+        public 
+    {
+        require(supportedChains[chainTo], "This chain is not supported");
 
-        erc20.burn(msg.sender, _amount);
+        erc20.burn(msg.sender, amount);
 
-        emit SwapInitialized(_amount, _chainTo, block.chainid, msg.sender, _to);
+        emit SwapInitialized(amount, msg.sender, to, chainTo, block.chainid, nonce);
     }
 
-    function redeem(bytes32 _hash, Signature memory _signature, uint256 _amount) public {
-        require(msg.sender == validator, "Not validator");
-        require(!redeemed[_hash], "Can't redeem twice");
-        address signer = ecrecover(_hash, _signature.v, _signature.r, _signature.s);
-        require(signer == validator, "Invalid signature");
+    function redeem(
+        address from, 
+        uint256 amount, 
+        uint8 v, 
+        bytes32 r, 
+        bytes32 s, 
+        uint256 chainFrom, 
+        uint256 nonce
+    ) 
+        public 
+    {
+        require(msg.sender == validator, "Not a validator");
+        require(supportedChains[chainFrom], "This chain is not supported");
+        bytes32 swapHash = keccak256(
+            abi.encodePacked(amount, from, chainFrom, nonce)
+        );
+        require(!redeemed[swapHash], "Cannot redeem twice");
+        require(checkSign(from, amount, v, r, s) == true, "Invalid signature");
 
-        erc20.mint(msg.sender, _amount);
-        redeemed[_hash] = true;
+        redeemed[swapHash] = true;
+        erc20.mint(msg.sender, amount);
 
-        emit SwapRedeemed(_hash, _amount, block.chainid, msg.sender);
+        emit SwapRedeemed(amount, msg.sender, chainFrom, swapHash);
+    }
+
+    function checkSign(
+        address _addr, 
+        uint256 _amount, 
+        uint8 _v, 
+        bytes32 _r, 
+        bytes32 _s
+    ) 
+        private 
+        view 
+        returns (bool) 
+    {
+        bytes32 message = keccak256(abi.encodePacked(_addr, _amount));
+        address signer = ecrecover(hashMessage(message), _v, _r, _s);
+
+        if (signer == validator) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    function hashMessage(bytes32 _message) private pure returns (bytes32) {
+        bytes memory prefix = "\x19Ethereum Signed Message:\n32";
+
+        return keccak256(abi.encodePacked(prefix, _message));
     }
 
     function addChain(uint256 _id) public onlyRole(DEFAULT_ADMIN_ROLE) {
