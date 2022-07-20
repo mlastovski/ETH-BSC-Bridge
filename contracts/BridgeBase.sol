@@ -3,8 +3,11 @@ pragma solidity ^0.8.11;
 
 import { ERC20 } from "./ERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "hardhat/console.sol";
 
 contract BridgeBase is AccessControl {
+    using ECDSA for bytes32;
     ERC20 erc20;
     address public validator;
 
@@ -47,7 +50,7 @@ contract BridgeBase is AccessControl {
     }
 
     function redeem(
-        address from, 
+        address to, 
         uint256 amount, 
         uint8 v, 
         bytes32 r, 
@@ -60,53 +63,27 @@ contract BridgeBase is AccessControl {
         require(msg.sender == validator, "Not a validator");
         require(supportedChains[chainFrom], "This chain is not supported");
         bytes32 swapHash = keccak256(
-            abi.encodePacked(amount, from, chainFrom, nonce)
+            abi.encodePacked(amount, to, chainFrom, nonce)
         );
         require(!redeemed[swapHash], "Cannot redeem twice");
-        require(checkSign(from, amount, v, r, s) == true, "Invalid signature");
+        address signer = ECDSA.recover(swapHash.toEthSignedMessageHash(), v, r, s);
+        require(signer == validator, "Invalid signature");
 
         redeemed[swapHash] = true;
-        erc20.mint(msg.sender, amount);
+        erc20.mint(to, amount);
 
-        emit SwapRedeemed(amount, msg.sender, chainFrom, swapHash);
+        emit SwapRedeemed(amount, to, chainFrom, swapHash);
     }
 
-    function checkSign(
-        address _addr, 
-        uint256 _amount, 
-        uint8 _v, 
-        bytes32 _r, 
-        bytes32 _s
-    ) 
-        private 
-        view 
-        returns (bool) 
-    {
-        bytes32 message = keccak256(abi.encodePacked(_addr, _amount));
-        address signer = ecrecover(hashMessage(message), _v, _r, _s);
+    function addChain(uint256 id) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        supportedChains[id] = true;
 
-        if (signer == validator) {
-            return true;
-        } else {
-            return false;
-        }
+        emit ChainAdded(id, msg.sender);
     }
 
-    function hashMessage(bytes32 _message) private pure returns (bytes32) {
-        bytes memory prefix = "\x19Ethereum Signed Message:\n32";
+    function removeChain(uint256 id) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        supportedChains[id] = false;
 
-        return keccak256(abi.encodePacked(prefix, _message));
-    }
-
-    function addChain(uint256 _id) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        supportedChains[_id] = true;
-
-        emit ChainAdded(_id, msg.sender);
-    }
-
-    function removeChain(uint256 _id) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        supportedChains[_id] = false;
-
-        emit ChainRemoved(_id, msg.sender);
+        emit ChainRemoved(id, msg.sender);
     }
 }
