@@ -1,7 +1,7 @@
 import { task } from "hardhat/config";
 import "@nomiclabs/hardhat-waffle";
 
-task("swap", "Mints tokens")
+task("swap", "Swaps tokens to another network")
   .addParam("contract", "Address of the contract")
   .addParam("amount", "Amount of tokens to swap")
   .addParam("to", "Address to swap to on another network")

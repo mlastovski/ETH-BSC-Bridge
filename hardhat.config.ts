@@ -46,6 +46,14 @@ const config: HardhatUserConfig = {
         process.env.MNEMONIC !== undefined ? [process.env.MNEMONIC] : [],
     },
 
+    bsc: {
+      url: "https://data-seed-prebsc-1-s1.binance.org:8545",
+      chainId: 97,
+      gasPrice: 20000000000,
+      accounts:
+        process.env.MNEMONIC !== undefined ? [process.env.MNEMONIC] : [],
+    },
+
     hardhat: {
       forking: {
         enabled: false,
