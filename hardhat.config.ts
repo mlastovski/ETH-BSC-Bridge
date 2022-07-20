@@ -9,7 +9,8 @@ import "@nomiclabs/hardhat-etherscan";
 import "@nomiclabs/hardhat-ethers";
 import "@nomicfoundation/hardhat-chai-matchers";
 import "hardhat-contract-sizer";
-// import "./tasks/mint.ts";
+import "./tasks/swap.ts";
+import "./tasks/redeem.ts";
 
 dotenv.config();
 
